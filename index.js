@@ -33,21 +33,22 @@ const transporter = nodemailer.createTransport({
 });
 
 // 3. Tarefa Agendada (Corre todos os dias às 08:00)
-// Para testar agora, troque '0 8 * * *' por '* * * * *' (corre a cada minuto)
-cron.schedule('0 8 * * *', async () => {
-  console.log('A verificar alunos inativos...');
+// 3. Tarefa Agendada (A CORRER A CADA 30 MINUTOS PARA TESTE)
+cron.schedule('*/30 * * * *', async () => {
+  console.log('A verificar alunos inativos (Modo Teste: a cada 30 min)...');
 
   try {
-    // Calcula a data de há 3 dias atrás
-    const tresDiasAtras = new Date();
-    tresDiasAtras.setDate(tresDiasAtras.getDate() - 3);
+    // TEMPORÁRIO PARA TESTE: Calcula a data de há 3 MINUTOS atrás
+    const tresMinutosAtras = new Date();
+    tresMinutosAtras.setMinutes(tresMinutosAtras.getMinutes() - 3);
 
+    // Procura utilizadores cuja última atividade foi antes desses 3 minutos
     const snapshot = await db.collection('users')
-      .where('ultimaAtividade', '<', tresDiasAtras)
+      .where('ultimaAtividade', '<', tresMinutosAtras)
       .get();
 
     if (snapshot.empty) {
-      console.log('Todos os alunos estão ativos!');
+      console.log('Nenhum aluno inativo encontrado neste ciclo de teste.');
       return;
     }
 
@@ -59,20 +60,16 @@ cron.schedule('0 8 * * *', async () => {
         const mailOptions = {
           from: `"Cyber Tech" <${process.env.EMAIL_USER}>`,
           to: user.email,
-          subject: 'Sentimos a sua falta nos Desafios! 🚀',
+          subject: 'Teste de Inatividade! 🚀',
           html: `
-            <h2>Olá ${user.name || 'Estudante'}, tudo bem?</h2>
-            <p>Reparámos que já se passaram alguns dias desde o seu último acesso à <strong>Cyber Tech</strong>.</p>
-            <p>Os seus certificados estão à sua espera! Volte para concluir as suas missões.</p>
-            <br>
-            <p>Um abraço,</p>
-            <p><strong>A Equipa Cyber Tech</strong></p>
+            <h2>Olá ${user.name || 'Estudante'}, este é um e-mail de teste!</h2>
+            <p>Se você está a receber isto, significa que o nosso robô detetou inatividade de 3 minutos e o cron job está a funcionar perfeitamente a cada meia hora.</p>
           `
         };
 
         try {
           await transporter.sendMail(mailOptions);
-          console.log(`Lembrete enviado para: ${user.email}`);
+          console.log(`Lembrete enviado com sucesso para: ${user.email}`);
         } catch (error) {
           console.error(`Erro ao enviar para ${user.email}:`, error);
         }
@@ -80,8 +77,6 @@ cron.schedule('0 8 * * *', async () => {
     });
 
   } catch (error) {
-    console.error('Erro na verificação diária:', error);
+    console.error('Erro na verificação do cron job:', error);
   }
 });
-
-console.log('Robô de inatividade iniciado e à espera do horário agendado...');
