@@ -1,16 +1,15 @@
 require('dotenv').config();
 const admin = require('firebase-admin');
-const nodemailer = require('nodemailer');
 const cron = require('node-cron');
 const express = require('express');
-const cors = require('cors'); // <-- Adicionado
-const { createClient } = require('redis'); // <-- Adicionado
+const cors = require('cors'); 
+const { createClient } = require('redis'); 
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// 1. Configurações do Express para receber chamadas do Frontend (CORS CORRIGIDO)
-app.use(cors({ origin: '*' })); // Permite que o Render receba chamadas do localhost e de outros domínios
+// 1. Configurações do Express para receber chamadas do Frontend
+app.use(cors({ origin: '*' })); 
 app.use(express.json()); 
 
 // 2. Conexão Segura com o Firebase
@@ -20,23 +19,7 @@ admin.initializeApp({
 });
 const db = admin.firestore();
 
-// 3. Configuração do Gmail para envio (CORRIGIDO PARA EVITAR TIMEOUT NO RENDER)
-const transporter = nodemailer.createTransport({
-  host: 'smtp.gmail.com',
-  port: 465,
-  secure: true, // true para porta 465
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS 
-  },
-  tls: {
-    rejectUnauthorized: false // Ajuda a prevenir bloqueios em servidores Cloud
-  }
-});
-
-// --- NOVA SECÇÃO: CONFIGURAÇÃO DO REDIS ---
-// Dica: Use uma variável de ambiente para a URL no Render. 
-// Localmente, se não existir, ele liga ao localhost por defeito.
+// --- SECÇÃO: CONFIGURAÇÃO DO REDIS ---
 const redisClient = createClient({ 
   url: process.env.REDIS_URL || 'redis://127.0.0.1:6379' 
 });
@@ -45,7 +28,7 @@ redisClient.connect()
   .then(() => console.log('Ligado ao banco de dados em memória Redis com sucesso! 🗄️'))
   .catch(console.error);
 
-// 30 minutos em segundos
+// 30 minutos em segundos (Pode reduzir este valor depois para os testes de sessão)
 const TEMPO_INATIVIDADE_TESTE = 1800; 
 
 // Endpoint para renovar a sessão do utilizador
@@ -62,6 +45,9 @@ app.post('/api/heartbeat', async (req, res) => {
     await db.collection('users').doc(uid).set({
       ultimaAtividade: admin.firestore.FieldValue.serverTimestamp()
     }, { merge: true });
+
+    // Mensagem opcional para ver a atividade no painel do Render
+    console.log(`📡 Atividade detetada! Sessão renovada para: ${uid}`);
 
     res.sendStatus(200);
   } catch (error) {
@@ -92,17 +78,17 @@ app.get('/', (req, res) => {
   res.send('O Robô da Cyber Tech está online, a monitorizar inatividade e com Redis ativo! 🤖');
 });
 
-// 4. Tarefa Agendada (ALTERADO PARA CORRER A CADA 10 MINUTOS)
-cron.schedule('*/10 * * * *', async () => {
-  console.log('A verificar alunos inativos (Modo Teste: a cada 10 min)...');
+// 4. Tarefa Agendada (ALTERADO PARA CORRER A CADA 2 MINUTOS)
+cron.schedule('*/2 * * * *', async () => {
+  console.log('A verificar alunos inativos (Modo Teste: a cada 2 min)...');
 
   try {
-    // Mantemos a regra de procurar quem não mexe há mais de 3 minutos
-    const tresMinutosAtras = new Date();
-    tresMinutosAtras.setMinutes(tresMinutosAtras.getMinutes() - 3);
+    // Procura quem não mexe há mais de 2 minutos
+    const doisMinutosAtras = new Date();
+    doisMinutosAtras.setMinutes(doisMinutosAtras.getMinutes() - 2);
 
     const snapshot = await db.collection('users')
-      .where('ultimaAtividade', '<', tresMinutosAtras)
+      .where('ultimaAtividade', '<', doisMinutosAtras)
       .get();
 
     if (snapshot.empty) {
@@ -114,21 +100,35 @@ cron.schedule('*/10 * * * *', async () => {
       const user = doc.data();
       
       if (user.email) {
-        const mailOptions = {
-          from: `"Cyber Tech" <${process.env.EMAIL_USER}>`,
-          to: user.email,
-          subject: 'Teste de Inatividade! 🚀',
-          html: `
-            <h2>Olá ${user.name || 'Estudante'}, este é um e-mail de teste!</h2>
-            <p>Se você está a receber isto, significa que o nosso robô detetou inatividade (mais de 3 minutos sem interação) e o cron job está a funcionar perfeitamente. <strong>Esta verificação ocorre a cada 10 minutos.</strong></p>
-          `
-        };
-
         try {
-          await transporter.sendMail(mailOptions);
-          console.log(`Lembrete enviado com sucesso para: ${user.email}`);
+          // Usando a porta segura 443 via Brevo API em vez do Nodemailer
+          const response = await fetch('https://api.brevo.com/v3/smtp/email', {
+            method: 'POST',
+            headers: {
+              'accept': 'application/json',
+              'api-key': process.env.BREVO_API_KEY, 
+              'content-type': 'application/json'
+            },
+            body: JSON.stringify({
+              sender: { email: process.env.EMAIL_USER, name: 'Robô Cyber Tech' },
+              to: [{ email: user.email }],
+              subject: 'Teste de Inatividade! 🚀',
+              htmlContent: `
+                <h2>Olá ${user.name || 'Estudante'}, este é um e-mail de teste!</h2>
+                <p>Se você está a receber isto, significa que o nosso robô detetou inatividade (mais de 2 minutos sem interação) e o envio via API HTTP está a funcionar perfeitamente.</p>
+                <p><strong>Esta verificação ocorre a cada 2 minutos.</strong></p>
+              `
+            })
+          });
+
+          if (response.ok) {
+            console.log(`Lembrete HTTP enviado com sucesso para: ${user.email}`);
+          } else {
+            const erroAPI = await response.text();
+            console.error(`Falha na API ao enviar para ${user.email}. Detalhes:`, erroAPI);
+          }
         } catch (error) {
-          console.error(`Erro ao enviar para ${user.email}:`, error);
+          console.error(`Erro crítico de comunicação com a Brevo para ${user.email}:`, error);
         }
       }
     });
