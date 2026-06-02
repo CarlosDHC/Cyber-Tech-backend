@@ -29,7 +29,7 @@ redisClient.connect()
   .catch(console.error);
 
 // 12 horas en segundos (12 * 60 * 60) o teste de 2 minutos --> 1800
-const TEMPO_INATIVIDADE = 1800; 
+const TEMPO_INATIVIDADE = 43200; 
 
 // Endpoint para renovar a sesión do usuario
 app.post('/api/heartbeat', async (req, res) => {
