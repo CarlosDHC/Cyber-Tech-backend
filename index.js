@@ -19,7 +19,7 @@ admin.initializeApp({
 });
 const db = admin.firestore();
 
-// 3. Configuração do Redis (Variável do Upstash configurada no Render)
+// 3. Configuração do Redis
 const redisClient = createClient({ 
   url: process.env.REDIS_URL || 'redis://127.0.0.1:6379' 
 });
@@ -28,8 +28,8 @@ redisClient.connect()
   .then(() => console.log('Ligado ao banco de dados em memória Redis com sucesso! 🗄️'))
   .catch(console.error);
 
-// --- ALTERAÇÃO AQUI: 10 minutos de inatividade em segundos (10 * 60) ---
-const TEMPO_INATIVIDADE = 600; 
+// --- OFICIAL: 12 horas de inatividade em segundos (12 * 60 * 60) ---
+const TEMPO_INATIVIDADE = 43200; 
 
 // ==========================================
 // ROTAS DA API
@@ -140,16 +140,16 @@ app.get('/', (req, res) => {
 
 
 // ==========================================
-// CRON JOB: VERIFICAÇÃO DE INATIVIDADE (10 MIN)
+// CRON JOB: VERIFICAÇÃO DE INATIVIDADE (12 HORAS)
 // ==========================================
-// Corre a cada 5 minutos para ser preciso
-cron.schedule('*/5 * * * *', async () => {
+// Corre a cada 30 minutos para poupar recursos
+cron.schedule('*/30 * * * *', async () => {
   console.log('A verificar utilizadores inativos...');
 
   try {
-    // --- ALTERAÇÃO AQUI: 10 minutos atrás ---
+    // --- OFICIAL: 12 horas atrás ---
     const limiteInatividade = new Date();
-    limiteInatividade.setMinutes(limiteInatividade.getMinutes() - 10);
+    limiteInatividade.setHours(limiteInatividade.getHours() - 12);
 
     const snapshot = await db.collection('users')
       .where('ultimaAtividade', '<', limiteInatividade)
@@ -180,7 +180,7 @@ cron.schedule('*/5 * * * *', async () => {
                   </div>
                   <div style="padding: 30px;">
                     <h2 style="color: #0056b3; font-size: 20px; margin-top: 0;">Olá, ${user.name || 'Estudante'}.</h2>
-                    <p style="font-size: 16px; line-height: 1.5;">Informamos que a sua sessão na plataforma <strong>Cyber Tech</strong> foi encerrada automaticamente devido a um período de inatividade superior a <strong>10 minutos</strong>.</p>
+                    <p style="font-size: 16px; line-height: 1.5;">Informamos que a sua sessão na plataforma <strong>Cyber Tech</strong> foi encerrada automaticamente devido a um período de inatividade superior a <strong>12 horas</strong>.</p>
                     <p style="font-size: 16px; line-height: 1.5;">Esta é uma medida de segurança padrão para proteger os seus dados e o progresso dos seus estudos. Para retomar as suas atividades e aceder aos conteúdos, basta realizar um novo login.</p>
                     <div style="text-align: center; margin: 30px 0;">
                       <a href="https://cyber-tech-project.web.app/" style="background-color: #0056b3; color: #ffffff; text-decoration: none; padding: 12px 25px; border-radius: 5px; font-weight: bold; font-size: 16px;">Fazer Login Novamente</a>
