@@ -31,9 +31,9 @@ redisClient.connect()
 // --- OFICIAL: 12 horas de inatividade em segundos (12 * 60 * 60) ---
 const TEMPO_INATIVIDADE = 43200; 
 
-// ==========================================
+
 // ROTAS DA API
-// ==========================================
+
 
 // Endpoint para renovar a sessão do utilizador (Heartbeat)
 app.post('/api/heartbeat', async (req, res) => {
@@ -99,11 +99,11 @@ app.post('/api/notify-login', async (req, res) => {
           subject: 'Alerta de Segurança: Novo Login Detetado',
           htmlContent: `
             <div style="font-family: Arial, sans-serif; color: #333; max-width: 600px; margin: 0 auto; border: 1px solid #ddd; border-radius: 8px; overflow: hidden;">
-              <div style="background-color: #28a745; padding: 20px; text-align: center;">
+              <div style="background-color: #095e8b; padding: 20px; text-align: center;">
                 <h1 style="color: #ffffff; margin: 0; font-size: 24px;">Cyber Tech</h1>
               </div>
               <div style="padding: 30px;">
-                <h2 style="color: #28a745; font-size: 20px; margin-top: 0;">Novo Acesso Detetado</h2>
+                <h2 style="color: #095e8b; font-size: 20px; margin-top: 0;">Novo Acesso Detetado</h2>
                 <p style="font-size: 16px; line-height: 1.5;">Olá, <strong>${name || 'Estudante'}</strong>.</p>
                 <p style="font-size: 16px; line-height: 1.5;">Informamos que a sua conta foi acedida com sucesso na nossa plataforma de estudos.</p>
                 <p style="font-size: 16px; line-height: 1.5;">Data e Hora do Acesso: <strong>${new Date().toLocaleString('pt-PT')}</strong></p>
@@ -139,9 +139,9 @@ app.get('/', (req, res) => {
 });
 
 
-// ==========================================
+
 // CRON JOB: VERIFICAÇÃO DE INATIVIDADE (12 HORAS)
-// ==========================================
+
 // Corre a cada 30 minutos para poupar recursos
 cron.schedule('*/30 * * * *', async () => {
   console.log('A verificar utilizadores inativos...');
